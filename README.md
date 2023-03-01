@@ -3,7 +3,7 @@ This yet another simple script from me, based on the same code-base as most of m
 
 So far, the script has been tested for about five minutes, but based on the information gathered bu others, it should be safe to run. It only runs two standard queries to the ECU every 60 seconds.
 
-The script is highly based on the work of others, and most of the information found to create this came from npeter's greate README here: https://github.com/npeter/ioBroker.apsystems-ecu
+The script is highly based on the work of others, and most of the information found to create this came from npeter's great README here: https://github.com/npeter/ioBroker.apsystems-ecu
 
 In order to run this script, you (obviously) need PHP installed. This script utilizes Bluerhinos' project phpMQTT, which can be found here: https://github.com/bluerhinos/phpMQTT 
 
