@@ -1,5 +1,5 @@
 # APSystems-MQTT
-This yet another simple script from me, based on the same code-base as most of my MQTT home automation scripts.
+This is yet another simple script from me, based on the same code-base as most of my MQTT home automation scripts.
 
 So far, the script has been tested for about five minutes, but based on the information gathered bu others, it should be safe to run. It only runs two standard queries to the ECU every 60 seconds.
 
