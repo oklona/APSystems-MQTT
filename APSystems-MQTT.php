@@ -21,9 +21,24 @@ $ipaddress='';
 $tcpport='';
 
 ################################################################################################################################################
-######		getRESTData - Function used to retrieve REST data from server.
+######		getLocation - Function used to retrieve location data based on IP.
 ################################################################################################################################################
 
+function getLocation() {
+    /* Find my location based on IP. This should be sufficient. */
+    $ch = curl_init("https://ipinfo.io");                                                                      
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST,"GET");                                                                     
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $headers=array();
+    $result = curl_exec($ch);
+    #var_dump($result );
+
+    $data=json_decode($result,true);
+    $location=explode(",",$data["loc"]);
+
+    return $location;
+
+}
 
 ################################################################################################################################################
 ######		createconfig - Function to prompt for config data, and create config file.
@@ -123,9 +138,29 @@ if ((file_exists($folder . '/APSystems-config.php') == false ) || $create) {
 	}
 }
 
+$location=getLocation();
+$longitude=floatval($location[0]);
+$latitude=floatval($location[1]);
+
+$sun=date_sun_info(time(),$longitude,$latitude);
+
+if ($debug) {echo "Sunrise: " . date("H:i:s dMy", $sun["sunrise"]) . PHP_EOL;}
+if ($debug) {echo "Sunset: " . date("H:i:s dMy", $sun["sunset"]) . PHP_EOL;}
+
+
+
 $config = include($folder.'/APSystems-config.php');
 $run=true;
 $count=0;
+if (time() > $sun["sunrise"] && time() < $sun["sunset"]) {
+    $daytime=true;
+}
+else {
+    $daytime=false;
+}
+
+if ($debug && $daytime) {echo "Daytime: Yes" . PHP_EOL;}
+if ($debug && !$daytime) {echo "Daytime: NO" . PHP_EOL;}
 
 $mosquitto_host=$config['mosquitto_host'];
 $mosquitto_user=$config['mosquitto_user'];
@@ -155,7 +190,15 @@ if($single) {
 $count=60;
 while($mqtt->proc()){
 	if ( $count==60) {
-		retrieveandpublish($folder,$mqtt);
+        if (time() > $sun["sunrise"] && time() < $sun["sunset"]) {
+            retrieveandpublish($folder,$mqtt);
+        }
+        else {
+            if (date("d",$sun["sunset"]) != date("d",time())){
+                // If day from sun-info is different form "today", refresh sun-info
+                $sun=date_sun_info(time(),$longitude,$latitude);
+            }
+        }
 		$count=0;
 	}
 	sleep(1);
