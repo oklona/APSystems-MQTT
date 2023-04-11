@@ -3,7 +3,7 @@
 ######
 ######		APSystems2MQTT.php
 ######		Script by Ole Kristian Lona, to read data locally from APSystems ECU-R, and transfer through MQTT.
-######		Version 0.1
+######		Version 0.2
 ######
 ################################################################################################################################################
 
@@ -19,6 +19,7 @@ $topicbase='';
 $config='';
 $ipaddress='';
 $tcpport='';
+$testreset=false;
 
 ################################################################################################################################################
 ######		getLocation - Function used to retrieve location data based on IP.
@@ -29,7 +30,6 @@ function getLocation() {
     $ch = curl_init("https://ipinfo.io");                                                                      
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST,"GET");                                                                     
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $headers=array();
     $result = curl_exec($ch);
     #var_dump($result );
 
@@ -38,6 +38,43 @@ function getLocation() {
 
     return $location;
 
+}
+
+################################################################################################################################################
+######		resetECU - Reset ECU Wireless if it stops responding
+################################################################################################################################################
+
+function resetECU($IPAddr)
+{
+	global $debug;
+	
+    $url="http://" . $IPAddr . "/index.php/management/set_wlan_ap";
+	$ch = curl_init($url);                                                                      
+	curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                                                                     
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+	$headers=array();
+	
+	array_push($headers, 'X-Requested-With: XMLHttpRequest');
+    $postdata="SSID=APSystems-Reset&channel=0&method=2&psk_wep=&psk_wpa=Testing123";
+    
+    if($debug){
+		print $postdata . PHP_EOL;
+		print $url . PHP_EOL;
+	}
+    	
+	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+	curl_setopt($ch,CURLOPT_POSTFIELDS, $postdata);
+	
+    #$result = curl_exec($ch);
+    $result="Test";
+	#var_dump($result );
+
+	if($debug){
+		print "ECU Reset" . PHP_EOL;
+	}
+
+    return $result;
 }
 
 ################################################################################################################################################
@@ -187,9 +224,9 @@ if($single) {
 	exit(0);
 }
 
-$count=60;
+$count=30;
 while($mqtt->proc()){
-	if ( $count==60) {
+	if ( $count==30) {
         if (time() > $sun["sunrise"] && time() < $sun["sunset"]) {
             retrieveandpublish($folder,$mqtt);
         }
@@ -201,7 +238,7 @@ while($mqtt->proc()){
         }
 		$count=0;
 	}
-	sleep(1);
+	sleep(10);
 	$count = $count + 1;
 }
 		
@@ -221,6 +258,7 @@ function retrieveandpublish($folder,$mqtt) {
 	global $baseurl; 
 	global $ipaddress;
 	global $tcpport;
+    global $testreset;
 
 
     /* Get common ECU information. */
@@ -254,7 +292,7 @@ function retrieveandpublish($folder,$mqtt) {
     if ($debug) { echo "OK.\n\n"; }
 
 
-    if (strlen($out) > 50) {
+    if (strlen($out) > 50 && $testreset === false ) {
         $ID=substr($out,13,12);
         $model=substr($out,25,2);
         $power=hexdec(bin2hex(substr($out,31,4)));
@@ -275,6 +313,13 @@ function retrieveandpublish($folder,$mqtt) {
         $mqtt->publish($topicbase . $ID . "/invertersonline", $invonline);
         $mqtt->publish($topicbase . $ID . "/version", $version);
     }
+    else{  //assume ECU has stopped responding...
+        if ($debug) { echo "Trying to reset ECU..." . PHP_EOL; }
+        $result=resetECU($ipaddress);
+        $testreset=false;
+        if ($debug) { echo "ECU reset finished..." . PHP_EOL; }
+        return 0;
+    } 
 
     /* Get information per inverter */
     $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
