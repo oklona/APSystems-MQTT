@@ -48,6 +48,39 @@ function resetECU($IPAddr)
 {
 	global $debug;
 	
+    # First, fetch current values for SSID and password.
+    $htmlContent = file_get_contents("http://" . $IPAddr . "/index.php/management/wlan");
+
+    $lines=explode("\n",$htmlContent);
+
+    foreach($lines as $line){
+        if(strstr($line,'inputdata1') > 0 && strstr($line,"value") > 0){
+            # <input type="text" name="SSID" class="form-control" id="inputdata1" value="ECU_R_216200047076">
+            $head=(strstr($line,"value"));
+            
+            $start=strpos($head,'"') + 1;
+            $stop=strrpos($head,'"');
+            $SSID=substr($head,$start, $stop - $start );
+        }
+        if(strstr($line,'inputdata5') > 0 && strstr($line,"placeholder") > 0 ){
+            # <input type="text" name="psk_wpa" class="form-control" id="inputdata5" placeholder="Testing123">
+            $head=(strstr($line,"placeholder"));
+            $start=strpos($head,'"') + 1;
+            $stop=strrpos($head,'"');
+            $Pass=substr($head,$start, $stop - $start );
+        }
+    }
+
+    if ( strlen($SSID) == 0 ) {
+        $SSID="APSystems2MQTT";
+    }
+
+    if ( strlen($Pass) == 0 ) {
+        $Pass="APSystems2MQTT12345";
+    }
+    
+    # Then, use them to reset ECU
+
     $url="http://" . $IPAddr . "/index.php/management/set_wlan_ap";
 	$ch = curl_init($url);                                                                      
 	curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                                                                     
@@ -56,7 +89,7 @@ function resetECU($IPAddr)
 	$headers=array();
 	
 	array_push($headers, 'X-Requested-With: XMLHttpRequest');
-    $postdata="SSID=APSystems-Reset&channel=0&method=2&psk_wep=&psk_wpa=Testing123";
+    $postdata="SSID=" . $SSID . "&channel=0&method=2&psk_wep=&psk_wpa=" . $Pass;
     
     if($debug){
 		print $postdata . PHP_EOL;
@@ -66,10 +99,8 @@ function resetECU($IPAddr)
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 	curl_setopt($ch,CURLOPT_POSTFIELDS, $postdata);
 	
-    #$result = curl_exec($ch);
-    $result="Test";
-	#var_dump($result );
-
+    $result = curl_exec($ch);
+    
 	if($debug){
 		print "ECU Reset" . PHP_EOL;
 	}
